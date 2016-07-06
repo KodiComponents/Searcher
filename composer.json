@@ -13,7 +13,10 @@
   "require": {
     "php": ">=5.5.9",
     "illuminate/support": "5.*",
-    "kodicomponents/support": "0.*"
+    "illuminate/database": "5.*",
+    "kodicomponents/support": "0.*",
+    "vinkla/algolia": "^2.3",
+    "elasticsearch/elasticsearch": "~2.0"
   },
   "require-dev": {
     "mockery/mockery": "0.9.*",
