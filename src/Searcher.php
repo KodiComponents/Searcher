@@ -5,7 +5,9 @@ namespace KodiComponents\Searcher;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Collection;
+use KodiComponents\Searcher\Contracts\Indexable;
 use KodiComponents\Searcher\Contracts\Searchable;
+use KodiComponents\Searcher\Contracts\SearchConfiguratorInterface;
 use KodiComponents\Searcher\Contracts\SearchEngineInterface;
 
 class Searcher
@@ -42,16 +44,19 @@ class Searcher
     }
 
     /**
-     * @param Searchable $model
+     * @param SearchConfiguratorInterface $config
      *
      * @return $this
      */
-    public function register(Searchable $model)
+    public function register(SearchConfiguratorInterface $config = null)
     {
         /** @var SearchEngineInterface $engine */
-        $this->models->put(get_class($model), $engine = $this->manager->driver($this->getModelEngine($model)));
+        $this->models->put(
+            get_class($config->getModel()),
+            $engine = $this->manager->driver($config->engine())
+        );
 
-        $engine->setModel($model);
+        $engine->setConfigurator($config);
 
         return $this;
     }
@@ -82,29 +87,69 @@ class Searcher
             }
         }
 
-        $result = $results->sortBy(function (Searchable $item) {
-            return $item->getDocumentScore();
-        });
-
         if (is_null($perPage)) {
-            return $result;
+            return $results;
         }
 
         $page = Paginator::resolveCurrentPage($pageName);
 
-        return new LengthAwarePaginator($result, $result->count(), $perPage, $page, [
+        return new LengthAwarePaginator($results, $results->count(), $perPage, $page, [
             'path' => Paginator::resolveCurrentPath(),
             'pageName' => $pageName,
         ]);
     }
 
     /**
-     * @param Searchable $model
-     *
-     * @return string|null
+     * @return $this
      */
-    protected function getModelEngine(Searchable $model)
+    public function createIndex()
     {
-        return property_exists($model, 'searchEngine') ? $model->searchEngine : null;
+        $this->getIndexable()->each(function(Indexable $engine) {
+            if (! $engine->indexExists()) {
+                $engine->createIndex();
+            }
+        });
+
+        return $this;
+    }
+
+    /**
+     * @return $this
+     */
+    public function deleteIndex()
+    {
+        $this->getIndexable()->each(function(Indexable $engine) {
+            if ($engine->indexExists()) {
+                $engine->deleteIndex();
+            }
+        });
+
+        return $this;
+    }
+
+    /**
+     * @return $this
+     */
+    public function reindex()
+    {
+        $this->getIndexable()->each(function(Indexable $engine) {
+            if ($engine->indexExists()) {
+                $engine->deleteIndex();
+            }
+
+            $engine->createIndex();
+        });
+
+        return $this;
+    }
+
+    /**
+     * @return Collection
+     */
+    public function getIndexable()
+    {
+        return $this->models->filter(function($engine) {
+            return ($engine instanceOf Indexable);
+        });
     }
 }

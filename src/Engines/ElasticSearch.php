@@ -2,11 +2,13 @@
 
 namespace KodiComponents\Searcher\Engines;
 
-use KodiComponents\Searcher\Contracts\Searchable;
+use Illuminate\Database\Eloquent\Model;
+use KodiComponents\Searcher\Contracts\ElasticSearchConfiguratorInterface;
+use KodiComponents\Searcher\Contracts\Indexable;
 use KodiComponents\Searcher\Contracts\SearchResultsInterface;
 use KodiComponents\Searcher\Exceptions\DocumentMissingException;
 
-class ElasticSearch extends Engine
+class ElasticSearch extends Engine implements Indexable
 {
 
     /**
@@ -32,62 +34,61 @@ class ElasticSearch extends Engine
     }
 
     /**
+     * @return ElasticSearchConfiguratorInterface
+     */
+    public function getConfigurator()
+    {
+        return parent::getConfigurator();
+    }
+
+    /**
      * @param string $query
      *
      * @return SearchResultsInterface
      */
     public function search($query = "")
     {
-        $params = $this->getModel()->getSearchParams();
-
-        unset($params['id']);
-
-        $params['body']['query']['match']['_all'] = $query;
-        $result = $this->client->search($params);
-
-        return new ElasticSearchResults($this->getModel(), $result);
+        return new ElasticSearchResults(
+            $this,
+            $this->client->search(
+                $this->getConfigurator()->getSearchParams($query)
+            )
+        );
     }
 
     /**
-     * @param Searchable $model
+     * @param Model $model
      *
      * @throws DocumentMissingException
      */
-    public function addDocumentToIndex(Searchable $model)
+    public function addDocumentToIndex(Model $model)
     {
         if (! $model->exists) {
             throw new DocumentMissingException('Document does not exist.');
         }
 
-        $params = $model->getSearchParams();
+        $params = $this->getConfigurator()->getParams($model);
 
         // Get our document body data.
-        $params['body'] = $model->getSearchDocumentData();
-
-        // The id for the document must always mirror the
-        // key for this model, even if it is set to something
-        // other than an auto-incrementing value. That way we
-        // can do things like remove the document from
-        // the index, or get the document from the index.
-        $params['id'] = $model->getKey();
+        $params['body'] = $this->getConfigurator()->getDocumentData($model);
 
         $this->client->index($params);
     }
 
     /**
-     * @param Searchable $model
+     * @param Model $model
      */
-    public function deleteDocumentFromIndex(Searchable $model)
+    public function deleteDocumentFromIndex(Model $model)
     {
         $this->client->delete($model);
     }
 
     /**
-     * @param Searchable $model
+     * @param Model $model
      *
      * @throws DocumentMissingException
      */
-    public function reindexDocument(Searchable $model)
+    public function reindexDocument(Model $model)
     {
         $this->deleteDocumentFromIndex($model);
         $this->addDocumentToIndex($model);
@@ -98,17 +99,19 @@ class ElasticSearch extends Engine
      */
     public function createIndex()
     {
-        $index = ['index' => $this->getModel()->getIndexName()];
+        $index = ['index' => $this->getConfigurator()->index()];
 
-        if (property_exists($this->getModel(), 'number_of_shards')) {
-            $index['body']['settings']['number_of_shards'] = $this->getModel()->number_of_shards;
+        if ($shards = $this->getConfigurator()->getNumberOfShards()) {
+            $index['body']['settings']['number_of_shards'] = $shards;
         }
 
-        if (property_exists($this->getModel(), 'number_of_replicas')) {
-            $index['body']['settings']['number_of_replicas'] = $this->getModel()->number_of_replicas;
+        if ($replicas = $this->getConfigurator()->getNumberOfReplicas()) {
+            $index['body']['settings']['number_of_replicas'] = $replicas;
         }
 
-        $this->client->indices()->create($this->getModel()->getIndexName());
+        $this->client->indices()->create($index);
+
+        $this->rebuildMapping();
     }
 
     /**
@@ -116,7 +119,11 @@ class ElasticSearch extends Engine
      */
     public function deleteIndex()
     {
-        $this->client->indices()->delete(['index' => $this->getModel()->getIndexName()]);
+        $this->client->indices()->delete([
+            'index' => $this->getConfigurator()->index()
+        ]);
+
+        $this->deleteMapping();
     }
 
     /**
@@ -128,6 +135,87 @@ class ElasticSearch extends Engine
      */
     public function indexExists()
     {
-        return $this->client->indices()->exists(['index' => $this->getModel()->getIndexName()]);
+        return $this->client->indices()->exists([
+            'index' => $this->getConfigurator()->index()
+        ]);
+    }
+
+    /**
+     * Get Mapping.
+     */
+    public function getMapping()
+    {
+        return $this->client->indices()->getMapping(
+            $this->getConfigurator()->getSearchParams($this->getModel())
+        );
+    }
+
+    /**
+     * Put Mapping.
+     *
+     * @param  bool $ignoreConflicts
+     *
+     * @return void
+     */
+    public function putMapping($ignoreConflicts = false)
+    {
+        $mapping = $this->getConfigurator()->getSearchParams($this->getModel());
+
+        unset($mapping['id']);
+
+        $params = [
+            '_source' => ['enabled' => true],
+            'properties' => $this->getConfigurator()->getMappingProperties(),
+        ];
+
+        $mapping['body'][$this->getModel()->getTable()] = $params;
+        $mapping['ignore_conflicts'] = $ignoreConflicts;
+
+        $this->client->indices()->putMapping($mapping);
+    }
+
+    /**
+     * Delete Mapping.
+     *
+     * @return void
+     */
+    public function deleteMapping()
+    {
+        $mapping = $this->getConfigurator()->getSearchParams($this->getModel());
+
+        $this->client->indices()->deleteMapping($mapping);
+    }
+
+    /**
+     * Rebuild Mapping.
+     *
+     * This will delete and then re-add
+     * the mapping for this model.
+     *
+     * @return void
+     */
+    public function rebuildMapping()
+    {
+        // If the mapping exists, let's delete it.
+        if ($this->mappingExists()) {
+            $this->deleteMapping();
+        }
+
+        // Don't need ignore conflicts because if we
+        // just removed the mapping there shouldn't
+        // be any conflicts.
+        $this->putMapping();
+    }
+
+    /**
+     * Mapping Exists.
+     *
+     * @return bool
+     */
+    public function mappingExists()
+    {
+        $mapping = $this->getConfigurator()->getMapping();
+
+        return (empty($mapping)) ? false : true;
     }
 }

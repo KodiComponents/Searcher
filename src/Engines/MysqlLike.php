@@ -4,8 +4,6 @@ namespace KodiComponents\Searcher\Engines;
 
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Eloquent\Builder;
-use KodiComponents\Searcher\Contracts\Model;
-use KodiComponents\Searcher\Contracts\Searchable;
 use KodiComponents\Searcher\Contracts\SearchResultsInterface;
 
 class MysqlLike extends Engine
@@ -34,63 +32,31 @@ class MysqlLike extends Engine
     }
 
     /**
-     * @param string $query
-     * @param int|null $perPage
-     * @param int $offset
-     *
-     * @return SearchResultsInterface
+     * @return \KodiComponents\Searcher\Configurators\MysqlLike
      */
-    public function search($query = "", $perPage = null, $offset = 0)
+    public function getConfigurator()
     {
-        /** @var \Illuminate\Database\Query\Builder $q */
-        $q = $this->getModel()->newQuery();
-
-        foreach ($this->getModel()->getSearchParams() as $field) {
-            $q->orWhere($field, 'like', "%{$query}%");
-        }
-
-        return new MysqlLikeResults($q->get());
+        return parent::getConfigurator();
     }
 
     /**
-     * Create Index.
+     * @param string $query
      *
-     * @return void
+     * @return SearchResultsInterface
      */
-    public function createIndex() {}
+    public function search($query = "")
+    {
+        /** @var Builder $builder */
+        $builder = $this->getModel()->newQuery();
 
-    /**
-     * @return void
-     */
-    public function deleteIndex() {}
+        foreach ($this->getConfigurator()->getSearchFields() as $index => $field) {
+            if(is_callable($field)) {
+                $field($builder, $query);
+            } else {
+                $builder->orWhere($field, 'like', "%{$query}%");
+            }
+        }
 
-    /**
-     * Index Exists.
-     *
-     * Does this index exist?
-     *
-     * @return bool
-     */
-    public function indexExists() {}
-
-    /**
-     * @param Searchable $model
-     *
-     * @return void
-     */
-    public function addDocumentToIndex(Searchable $model) {}
-
-    /**
-     * @param Searchable $model
-     *
-     * @return void
-     */
-    public function deleteDocumentFromIndex(Searchable $model) {}
-
-    /**
-     * @param Searchable $model
-     *
-     * @return void
-     */
-    public function reindexDocument(Searchable $model) {}
+        return new MysqlLikeResults($builder->get());
+    }
 }

@@ -3,7 +3,8 @@
 namespace KodiComponents\Searcher\Engines;
 
 use Illuminate\Database\Eloquent\Collection;
-use KodiComponents\Searcher\Contracts\Searchable;
+use Illuminate\Database\Eloquent\Model;
+use KodiComponents\Searcher\Contracts\SearchEngineInterface;
 use KodiComponents\Searcher\Contracts\SearchResultsInterface;
 
 class ElasticSearchResults implements SearchResultsInterface
@@ -14,18 +15,18 @@ class ElasticSearchResults implements SearchResultsInterface
     protected $result;
 
     /**
-     * @var Searchable
+     * @var SearchEngineInterface
      */
-    protected $model;
+    protected $engine;
 
     /**
-     * @param Searchable $model
+     * @param SearchEngineInterface $engine
      * @param array $result
      */
-    public function __construct(Searchable $model, array $result)
+    public function __construct(SearchEngineInterface $engine, array $result)
     {
         $this->result = $result;
-        $this->model = $model;
+        $this->engine = $engine;
     }
 
     /**
@@ -41,16 +42,16 @@ class ElasticSearchResults implements SearchResultsInterface
             $ids[array_get($hit, '_id')] = $hit;
         }
 
-        $items = $this->model->getQueryForFoundDocuments($ids)->get();
+        $items = $this->engine->getConfigurator()->getQueryForFoundDocuments($ids)->get();
 
-        $items->each(function(Searchable $item) use($items) {
-            // In addition to setting the attributes
-            // from the index, we will set the score as well.
-            $item->setDocumentScore(array_get($items, $item->getKey() . '._score'));
-
-            // Set our document version
-            $item->documentVersion = array_get($items, $item->getKey() . '._version');
-        });
+        //$items->each(function(Model $item) use($items) {
+        //    // In addition to setting the attributes
+        //    // from the index, we will set the score as well.
+        //    $item->setDocumentScore(array_get($items, $item->getKey() . '._score'));
+        //
+        //    // Set our document version
+        //    $item->documentVersion = array_get($items, $item->getKey() . '._version');
+        //});
 
         return $items;
     }

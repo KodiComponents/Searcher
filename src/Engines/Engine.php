@@ -4,35 +4,44 @@ namespace KodiComponents\Searcher\Engines;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use KodiComponents\Searcher\Contracts\Searchable;
+use KodiComponents\Searcher\Contracts\SearchConfiguratorInterface;
 use KodiComponents\Searcher\Contracts\SearchEngineInterface;
 
 abstract class Engine implements SearchEngineInterface
 {
-
     /**
-     * @var Searchable
+     * @var SearchConfiguratorInterface
      */
-    protected $model;
+    protected $configurator;
 
     /**
-     * @return Searchable
+     * @return Model
      */
     public function getModel()
     {
-        return $this->model;
+        return $this->configurator->getModel();
     }
 
     /**
-     * @param Searchable $model
+     * @return SearchConfiguratorInterface
      */
-    public function setModel(Searchable $model)
+    public function getConfigurator()
     {
-        $this->model = $model;
+        return $this->configurator;
     }
 
     /**
-     * @param array|Model|Searchable[] $documents
+     * @param SearchConfiguratorInterface $config
+     *
+     * @return void
+     */
+    public function setConfigurator(SearchConfiguratorInterface $config)
+    {
+        $this->configurator = $config;
+    }
+
+    /**
+     * @param array|Model[] $documents
      *
      * @return void
      */
@@ -48,7 +57,7 @@ abstract class Engine implements SearchEngineInterface
     }
 
     /**
-     * @param array|Model|Searchable[] $documents
+     * @param array|Model[] $documents
      *
      * @return void
      */
@@ -64,7 +73,7 @@ abstract class Engine implements SearchEngineInterface
     }
 
     /**
-     * @param array|Model|Searchable[] $documents
+     * @param array|Model[] $documents
      *
      * @return void
      */

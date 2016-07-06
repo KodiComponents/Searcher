@@ -4,6 +4,7 @@ namespace KodiComponents\Searcher\Engines;
 
 use Illuminate\Database\Eloquent\Collection;
 use KodiComponents\Searcher\Contracts\Searchable;
+use KodiComponents\Searcher\Contracts\SearchEngineInterface;
 use KodiComponents\Searcher\Contracts\SearchResultsInterface;
 
 class AlgoliaResults implements SearchResultsInterface
@@ -14,18 +15,18 @@ class AlgoliaResults implements SearchResultsInterface
     protected $result;
 
     /**
-     * @var Searchable
+     * @var SearchEngineInterface
      */
-    protected $model;
+    protected $engine;
 
     /**
-     * @param Searchable $model
+     * @param SearchEngineInterface $engine
      * @param array $result
      */
-    public function __construct(Searchable $model, array $result)
+    public function __construct(SearchEngineInterface $engine, array $result)
     {
         $this->result = $result;
-        $this->model = $model;
+        $this->engine = $engine;
     }
 
     /**
@@ -39,8 +40,10 @@ class AlgoliaResults implements SearchResultsInterface
             $ids[array_get($hit, 'objectID')] = $hit;
         }
 
-        $items = $this->model->getQueryForFoundDocuments($ids)->get();
-
-        return $items;
+        return $this
+            ->engine
+            ->getConfigurator()
+            ->getQueryForFoundDocuments($ids)
+            ->get();
     }
 }

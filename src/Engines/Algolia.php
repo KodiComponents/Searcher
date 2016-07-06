@@ -3,13 +3,14 @@
 namespace KodiComponents\Searcher\Engines;
 
 use AlgoliaSearch\Index;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
-use KodiComponents\Searcher\Contracts\Model;
-use KodiComponents\Searcher\Contracts\Searchable;
+use KodiComponents\Searcher\Contracts\AlgoliaConfiguratorInterface;
+use KodiComponents\Searcher\Contracts\Indexable;
 use KodiComponents\Searcher\Contracts\SearchResultsInterface;
 use KodiComponents\Searcher\Exceptions\DocumentMissingException;
 
-class Algolia extends Engine
+class Algolia extends Engine implements Indexable
 {
 
     /**
@@ -40,13 +41,26 @@ class Algolia extends Engine
     }
 
     /**
+     * @return AlgoliaConfiguratorInterface
+     */
+    public function getConfigurator()
+    {
+        return parent::getConfigurator();
+    }
+
+    /**
      * @param string $query
      *
      * @return SearchResultsInterface
      */
     public function search($query = "")
     {
-        $this->getIndex($this->getModel())->search($query, $this->getModel()->getSearchParams());
+        $results = $this->getIndex()->search(
+            $query,
+            $this->getConfigurator()->getSearchParams($query)
+        );
+
+        return new AlgoliaResults($this, $results);
     }
 
     /**
@@ -56,7 +70,7 @@ class Algolia extends Engine
      */
     public function createIndex()
     {
-        return $this->client->initIndex($this->getModel()->getIndexName());
+        return $this->client->initIndex($this->getConfigurator()->index());
     }
 
     /**
@@ -64,7 +78,7 @@ class Algolia extends Engine
      */
     public function deleteIndex()
     {
-        $this->client->deleteIndex($this->getModel()->getIndexName());
+        $this->client->deleteIndex($this->getConfigurator()->index());
     }
 
     /**
@@ -77,7 +91,7 @@ class Algolia extends Engine
     public function indexExists()
     {
         foreach (Arr::get($this->client->listIndexes(), 'items', []) as $index) {
-            if ($index['name'] == $this->getModel()->getIndexName()) {
+            if ($index['name'] == $this->getConfigurator()->index()) {
                 return true;
             }
         }
@@ -86,35 +100,41 @@ class Algolia extends Engine
     }
 
     /**
-     * @param Searchable $model
+     * @param Model $model
      *
      * @throws DocumentMissingException
      */
-    public function addDocumentToIndex(Searchable $model)
+    public function addDocumentToIndex(Model $model)
     {
         if (! $model->exists) {
             throw new DocumentMissingException('Document does not exist.');
         }
         
-        $this->getIndex()->addObject($model->getSearchDocumentData(), $model->getKey());
+        $this->getIndex()->addObject(
+            $this->getConfigurator()->getDocumentData($model),
+            $model->getKey()
+        );
     }
 
     /**
-     * @param Searchable $model
+     * @param Model $model
      *
      * @throws \Exception
      */
-    public function deleteDocumentFromIndex(Searchable $model)
+    public function deleteDocumentFromIndex(Model $model)
     {
         $this->getIndex()->deleteObject($model->getKey());
     }
 
     /**
-     * @param Searchable $model
+     * @param Model $model
      */
-    public function reindexDocument(Searchable $model)
+    public function reindexDocument(Model $model)
     {
-        $this->getIndex()->saveObject($model->getSearchDocumentData(), $model->getKey());
+        $this->getIndex()->saveObject(
+            $this->getConfigurator()->getDocumentData($model),
+            $model->getKey()
+        );
     }
 
     /**

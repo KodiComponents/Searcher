@@ -48,11 +48,9 @@ class SearchManager extends Manager
      */
     public function driver($driver = null)
     {
-        $driver = $driver ?: $this->getDefaultDriver();
-
-        $this->drivers[] = $this->createDriver($driver);
-
-        return $this->drivers[] = $this->createDriver($driver);
+        return $this->createDriver(
+            $driver ?: $this->getDefaultDriver()
+        );
     }
 
 
