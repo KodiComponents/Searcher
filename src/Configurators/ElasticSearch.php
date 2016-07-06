@@ -87,16 +87,21 @@ class ElasticSearch extends Configurator implements ElasticSearchConfiguratorInt
 
     /**
      * @param string $query
+     * @param array  $params
      *
      * @return array
      */
-    public function getSearchParams($query)
+    public function getSearchParams($query, array $params = [])
     {
         $params = $this->getParams($this->getModel());
 
         unset($params['id']);
 
-        $params['body']['query']['match']['_all'] = $query;
+        if (isset($params['query']) and is_callable($params['query'])) {
+            $params['body']['query'] = $params['query']($query);
+        } else {
+            $params['body']['query']['match']['_all'] = $query;
+        }
 
         return $params;
     }

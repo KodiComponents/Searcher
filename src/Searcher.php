@@ -2,6 +2,7 @@
 
 namespace KodiComponents\Searcher;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Collection;
@@ -69,6 +70,28 @@ class Searcher
     }
 
     /**
+     * @param string|Model $model
+     * @param string       $query
+     * @param int|null     $perPage
+     * @param string       $pageName
+     *
+     * @return LengthAwarePaginator|Collection
+     * @throws \Exception
+     */
+    public function searchIn($model, $query = "", $perPage = null, $pageName = 'page')
+    {
+        if ($model instanceof Model) {
+            $model = get_class($model);
+        }
+
+        if (! $this->models->offsetExists($model)) {
+            throw new \Exception("Search engine for model [{$model}] not found");
+        }
+
+        return $this->_search([$this->models->get($model)], $query = "", $perPage = null, $pageName = 'page');
+    }
+
+    /**
      * @param string $query
      * @param int|null $perPage
      * @param string $pageName
@@ -77,9 +100,22 @@ class Searcher
      */
     public function search($query = "", $perPage = null, $pageName = 'page')
     {
+        return $this->_search($this->getRegistered(), $query = "", $perPage = null, $pageName = 'page');
+    }
+
+    /**
+     * @param SearchEngineInterface[]  $engines
+     * @param string $query
+     * @param null   $perPage
+     * @param string $pageName
+     *
+     * @return LengthAwarePaginator|Collection
+     */
+    protected function _search(array $engines, $query = "", $perPage = null, $pageName = 'page')
+    {
         $results = new Collection();
 
-        foreach ($this->getRegistered() as $engine) {
+        foreach ($engines as $engine) {
             $search = $engine->search($query);
 
             foreach ($search->getResult() as $item) {

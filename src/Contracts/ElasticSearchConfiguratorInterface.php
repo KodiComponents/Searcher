@@ -15,10 +15,11 @@ interface ElasticSearchConfiguratorInterface extends SearchConfiguratorInterface
 
     /**
      * @param string $query
+     * @param array  $params
      *
      * @return array
      */
-    public function getSearchParams($query);
+    public function getSearchParams($query, array $params = []);
 
     /**
      * Get Mapping Properties.

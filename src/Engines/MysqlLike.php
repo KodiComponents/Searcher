@@ -41,21 +41,16 @@ class MysqlLike extends Engine
 
     /**
      * @param string $query
+     * @param array  $params
      *
      * @return SearchResultsInterface
      */
-    public function search($query = "")
+    public function search($query, array $params = [])
     {
         /** @var Builder $builder */
         $builder = $this->getModel()->newQuery();
 
-        foreach ($this->getConfigurator()->getSearchFields() as $index => $field) {
-            if(is_callable($field)) {
-                $field($builder, $query);
-            } else {
-                $builder->orWhere($field, 'like', "%{$query}%");
-            }
-        }
+        $this->getConfigurator()->prepareQuery($builder);
 
         return new MysqlLikeResults($builder->get());
     }

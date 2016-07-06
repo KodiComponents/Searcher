@@ -8,10 +8,11 @@ interface AlgoliaConfiguratorInterface extends SearchConfiguratorInterface
 {
     /**
      * @param string $query
+     * @param array  $params
      *
      * @return array
      */
-    public function getSearchParams($query);
+    public function getSearchParams($query, array $params = []);
 
     /**
      * @param Model $model

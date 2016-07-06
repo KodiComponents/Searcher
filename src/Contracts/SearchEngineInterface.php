@@ -18,8 +18,9 @@ interface SearchEngineInterface
 
     /**
      * @param string $query
+     * @param array  $params
      *
      * @return SearchResultsInterface
      */
-    public function search($query = "");
+    public function search($query, array $params = []);
 }

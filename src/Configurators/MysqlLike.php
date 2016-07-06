@@ -2,6 +2,7 @@
 
 namespace KodiComponents\Searcher\Configurators;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class MysqlLike extends Configurator
@@ -38,5 +39,16 @@ class MysqlLike extends Configurator
     public function getSearchFields()
     {
         return $this->searchFields;
+    }
+
+    /**
+     * @param mixed   $query
+     * @param Builder $builder
+     */
+    public function prepareQuery($query, Builder $builder)
+    {
+        foreach ($this->getSearchFields() as $field) {
+            $builder->orWhere($field, 'like', "%{$query}%");
+        }
     }
 }

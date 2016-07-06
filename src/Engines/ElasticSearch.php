@@ -43,15 +43,16 @@ class ElasticSearch extends Engine implements Indexable
 
     /**
      * @param string $query
+     * @param array  $params
      *
      * @return SearchResultsInterface
      */
-    public function search($query = "")
+    public function search($query, array $params = [])
     {
         return new ElasticSearchResults(
             $this,
             $this->client->search(
-                $this->getConfigurator()->getSearchParams($query)
+                $this->getConfigurator()->getSearchParams($query, $params)
             )
         );
     }

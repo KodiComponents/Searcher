@@ -17,10 +17,11 @@ class Algolia extends Configurator implements AlgoliaConfiguratorInterface
 
     /**
      * @param string $query
+     * @param array  $params
      *
      * @return array
      */
-    public function getSearchParams($query)
+    public function getSearchParams($query, array $params = [])
     {
         return [];
     }
